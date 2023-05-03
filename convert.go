@@ -33,7 +33,7 @@ func main() {
 		}
 		fmt.Printf("Made %s\n", tempdir)
 		defer os.RemoveAll(tempdir)
-		cmd := exec.Command("/usr/bin/unzip", fmt.Sprintf("%q", zipFilepath), fmt.Sprintf("-d %q", tempdir))
+		cmd := exec.Command("/usr/bin/unzip", zipFilepath, "-d", tempdir)
 		log.Println(cmd)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
