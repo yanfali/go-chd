@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -15,7 +16,7 @@ func main() {
 		log.Fatal(err)
 	}
 	for idx, f := range files {
-		if idx > 0 {
+		if idx > 3 {
 			fmt.Println("done")
 			os.Exit(0)
 		}
@@ -40,6 +41,35 @@ func main() {
 		err = cmd.Run()
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		zipdir, err := os.ReadDir(tempdir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Found %d", len(zipdir))
+		destname := path.Base(rootfilename)
+		os.MkdirAll(destname, 0755)
+		for _, zf := range zipdir {
+			log.Println(zf.Name())
+			if strings.HasSuffix(zf.Name(), ".cue") {
+				log.Printf("found %s\n", zf.Name())
+				cmd := exec.Command(
+					"chdman",
+					"createcd",
+					"-i",
+					fmt.Sprintf("%s/%s", tempdir, zf.Name()),
+					"-o",
+					fmt.Sprintf("%s/%s.chd", destname, destname),
+				)
+				log.Println(cmd)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				err = cmd.Run()
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 		}
 
 	}
