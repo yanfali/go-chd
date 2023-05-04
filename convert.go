@@ -51,24 +51,24 @@ func main() {
 		destname := path.Base(rootfilename)
 		os.MkdirAll(destname, 0755)
 		for _, zf := range zipdir {
-			log.Println(zf.Name())
-			if strings.HasSuffix(zf.Name(), ".cue") {
-				log.Printf("found %s\n", zf.Name())
-				cmd := exec.Command(
-					"chdman",
-					"createcd",
-					"-i",
-					fmt.Sprintf("%s/%s", tempdir, zf.Name()),
-					"-o",
-					fmt.Sprintf("%s/%s.chd", destname, destname),
-				)
-				log.Println(cmd)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				err = cmd.Run()
-				if err != nil {
-					log.Fatal(err)
-				}
+			if !strings.HasSuffix(zf.Name(), ".cue") {
+				continue
+			}
+			log.Printf("found %s\n", zf.Name())
+			cmd := exec.Command(
+				"chdman",
+				"createcd",
+				"-i",
+				fmt.Sprintf("%s/%s", tempdir, zf.Name()),
+				"-o",
+				fmt.Sprintf("%s/%s.chd", destname, destname),
+			)
+			log.Println(cmd)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err = cmd.Run()
+			if err != nil {
+				log.Fatal(err)
 			}
 		}
 
