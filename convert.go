@@ -10,63 +10,95 @@ import (
 	"strings"
 )
 
+const sourcePath = "/Volumes/Media/Emulation/ps1"
+const debug = true
+
+func unzip(source string, dest string) error {
+	cmd := exec.Command("/usr/bin/unzip", source, "-d", dest)
+	log.Println(cmd)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func compressToCHD(source string, dest string) error {
+	cmd := exec.Command(
+		"chdman",
+		"createcd",
+		"-i",
+		source,
+		"-o",
+		dest,
+	)
+	log.Println(cmd)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func main() {
-	files, err := os.ReadDir("/Volumes/Media/Emulation/ps1")
+
+	files, err := os.ReadDir(sourcePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	for idx, f := range files {
-		if idx > 3 {
-			fmt.Println("done")
-			os.Exit(0)
-		}
 		filename := f.Name()
-		if !strings.HasSuffix(filename, ".zip") {
+
+		if !f.Type().IsRegular() ||
+			!strings.HasSuffix(filename, ".zip") {
+			// ignore non zip files
 			continue
 		}
-		zipFilepath := filepath.Clean(fmt.Sprintf("%s/%s", "/Volumes/Media/Emulation/ps1", filename))
+
+		if debug && idx == 1 {
+			os.Exit(0)
+		}
+
+		zipFilepath := filepath.Clean(fmt.Sprintf("%s/%s", sourcePath, filename))
 		rootfilename := strings.Split(zipFilepath, ".")[0]
-		fmt.Printf("%s --> %s\n", filename, rootfilename)
 
-		tempdir, err := os.MkdirTemp("", "go-chd-")
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Made %s\n", tempdir)
-		defer os.RemoveAll(tempdir)
-		cmd := exec.Command("/usr/bin/unzip", zipFilepath, "-d", tempdir)
-		log.Println(cmd)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
+		fmt.Printf("Converting iso(%s) --> chd(%s)\n", filename, rootfilename)
+
+		tempDir, err := os.MkdirTemp("", "go-chd-")
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		zipdir, err := os.ReadDir(tempdir)
+		// clean up after ourselves
+		defer os.RemoveAll(tempDir)
+
+		log.Printf("Extracting to %s\n", tempDir)
+
+		err = unzip(zipFilepath, tempDir)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("Found %d", len(zipdir))
-		destname := path.Base(rootfilename)
-		os.MkdirAll(destname, 0755)
+
+		// read newly unpacked directory
+		zipdir, err := os.ReadDir(tempDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("Found %d files", len(zipdir))
+
+		destName := path.Base(rootfilename)
+		os.MkdirAll(destName, 0755)
+
 		for _, zf := range zipdir {
-			if !strings.HasSuffix(zf.Name(), ".cue") {
+
+			if !zf.Type().IsRegular() ||
+				!strings.HasSuffix(zf.Name(), ".cue") {
+				// skip non-cue files
 				continue
 			}
-			log.Printf("found %s\n", zf.Name())
-			cmd := exec.Command(
-				"chdman",
-				"createcd",
-				"-i",
-				fmt.Sprintf("%s/%s", tempdir, zf.Name()),
-				"-o",
-				fmt.Sprintf("%s/%s.chd", destname, destname),
-			)
-			log.Println(cmd)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err = cmd.Run()
+
+			log.Printf("Found cue file %s\n", zf.Name())
+			src := fmt.Sprintf("%s/%s", tempDir, zf.Name())
+			dest := fmt.Sprintf("%s/%s.chd", destName, destName)
+			compressToCHD(src, dest)
 			if err != nil {
 				log.Fatal(err)
 			}
