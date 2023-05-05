@@ -13,16 +13,25 @@ import (
 const sourcePath = "/Volumes/Media/Emulation/ps1"
 const debug = true
 
-func unzip(source string, dest string) error {
-	cmd := exec.Command("/usr/bin/unzip", source, "-d", dest)
+// execCmd wraps exec.Command with reasonable defaults and logging.
+// takes same arguments as exec.Command.
+func execCmd(executable string, args ...string) error {
+	cmd := exec.Command(executable, args...)
 	log.Println(cmd)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
+// unpack the indicated zip file into the specified directory
+// using the unzip command.
+func unzip(source string, dest string) error {
+	return execCmd("unzip", source, "-d", dest)
+}
+
+// compress the unpacked ISO into a CHD file.
 func compressToCHD(source string, dest string) error {
-	cmd := exec.Command(
+	return execCmd(
 		"chdman",
 		"createcd",
 		"-i",
@@ -30,25 +39,22 @@ func compressToCHD(source string, dest string) error {
 		"-o",
 		dest,
 	)
-	log.Println(cmd)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func main() {
-
+	// read sourcePath directory
 	files, err := os.ReadDir(sourcePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// search for zip files
 	for idx, f := range files {
 		filename := f.Name()
 
 		if !f.Type().IsRegular() ||
 			!strings.HasSuffix(filename, ".zip") {
-			// ignore non zip files
+			// skip non zip files
 			continue
 		}
 
