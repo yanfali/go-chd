@@ -8,6 +8,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/urfave/cli"
 )
 
 const sourcePath = "/Volumes/Media/Emulation/ps1"
@@ -41,7 +43,7 @@ func compressToCHD(source string, dest string) error {
 	)
 }
 
-func main() {
+func convert(c *cli.Context) {
 	// read sourcePath directory
 	files, err := os.ReadDir(sourcePath)
 	if err != nil {
@@ -111,4 +113,12 @@ func main() {
 		}
 
 	}
+}
+
+func main() {
+	app := cli.NewApp()
+	app.Name = "convert"
+	app.Usage = "convert zip compressed iso game files to CHD"
+	app.Action = convert
+	app.Run(os.Args)
 }
