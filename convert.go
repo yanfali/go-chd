@@ -8,20 +8,29 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli"
 )
 
-const sourcePath = "/Volumes/Media/Emulation/ps1"
-const debug = true
+var debug = false
+
+type Stats struct {
+	TotalProcessed int
+	ZipsProcessed  []string
+}
+
+var stats Stats
 
 // execCmd wraps exec.Command with reasonable defaults and logging.
 // takes same arguments as exec.Command.
 func execCmd(executable string, args ...string) error {
 	cmd := exec.Command(executable, args...)
 	log.Println(cmd)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if debug {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	return cmd.Run()
 }
 
@@ -43,7 +52,9 @@ func compressToCHD(source string, dest string) error {
 	)
 }
 
-func convert(c *cli.Context) {
+func convert(cCtx *cli.Context) {
+	log.Printf("%+v\n", stats)
+	sourcePath := cCtx.String("sourcePath")
 	// read sourcePath directory
 	files, err := os.ReadDir(sourcePath)
 	if err != nil {
@@ -67,7 +78,7 @@ func convert(c *cli.Context) {
 		zipFilepath := filepath.Clean(fmt.Sprintf("%s/%s", sourcePath, filename))
 		rootfilename := strings.Split(zipFilepath, ".")[0]
 
-		fmt.Printf("Converting iso(%s) --> chd(%s)\n", filename, rootfilename)
+		log.Printf("Converting iso(%s) --> chd(%s)\n", filename, rootfilename)
 
 		tempDir, err := os.MkdirTemp("", "go-chd-")
 		if err != nil {
@@ -92,8 +103,10 @@ func convert(c *cli.Context) {
 
 		log.Printf("Found %d files", len(zipdir))
 
+		destPath := cCtx.String("destPath")
 		destName := path.Base(rootfilename)
-		os.MkdirAll(destName, 0755)
+		fullDestDir := fmt.Sprintf("%s/%s", destPath, destName)
+		os.MkdirAll(fullDestDir, 0755)
 
 		for _, zf := range zipdir {
 
@@ -105,20 +118,47 @@ func convert(c *cli.Context) {
 
 			log.Printf("Found cue file %s\n", zf.Name())
 			src := fmt.Sprintf("%s/%s", tempDir, zf.Name())
-			dest := fmt.Sprintf("%s/%s.chd", destName, destName)
+
+			dest := fmt.Sprintf("%s/%s/%s.chd", destPath, destName, destName)
 			compressToCHD(src, dest)
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			stats.TotalProcessed++
+			stats.ZipsProcessed = append(stats.ZipsProcessed, destName)
 		}
 
 	}
+
+	log.Printf("%+v\n", stats)
 }
 
 func main() {
-	app := cli.NewApp()
-	app.Name = "convert"
-	app.Usage = "convert zip compressed iso game files to CHD"
-	app.Action = convert
-	app.Run(os.Args)
+	app := &cli.App{
+		Name:  "go-chd",
+		Usage: "convert zip compressed iso game files to CHD",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "sourcePath",
+				Usage:    "Path to scan for zip files",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "destPath",
+				Usage: "Path write to",
+				Value: ".",
+			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Usage:       "debug mode - only decode 1 file",
+				Destination: &debug,
+			},
+		},
+		Action: convert,
+	}
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+	time.Sleep(time.Second * 1)
 }
